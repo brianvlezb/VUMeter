@@ -54,12 +54,21 @@ jobs:
           arch: x64
 
       # -----------------------------------------------------------------------
-      # 5. Compile → VUMeter.dll  (64-bit release)
+      # 5. Copy SDK headers into src\ so relative #includes always resolve
+      # -----------------------------------------------------------------------
+      - name: Copy SDK headers into src
+        shell: pwsh
+        run: |
+          Copy-Item "$env:VDJ_INC\*.h" -Destination "src\" -Force
+          Write-Host "Headers in src\:"
+          Get-ChildItem src\*.h | Select-Object Name
+
+      # -----------------------------------------------------------------------
+      # 6. Compile → VUMeter.dll  (64-bit release)
       # -----------------------------------------------------------------------
       - name: Compile VUMeter.dll
         shell: cmd
         run: |
-          set INC=%VDJ_INC%
           cl.exe ^
             /LD ^
             /O2 ^
@@ -67,7 +76,6 @@ jobs:
             /std:c++17 ^
             /W3 ^
             /nologo ^
-            /I "%INC%" ^
             src\VUMeter.cpp ^
             src\Main.cpp ^
             /Fe:VUMeter.dll ^
