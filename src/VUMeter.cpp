@@ -1,6 +1,11 @@
 #include "VUMeter.h"
 
+// Umbral mínimo para evitar log(0)
 static const float RMS_FLOOR = 0.000001f;
+
+// Tiempo de integración VU estándar: ~300 ms
+// alpha se recalcula en OnStart cuando conocemos el sampleRate y block size
+static const float VU_INTEGRATION_MS = 300.0f;
 
 // ---------------------------------------------------------------------------
 CVUMeter::CVUMeter()  {}
@@ -19,48 +24,70 @@ HRESULT VDJ_API CVUMeter::OnGetPluginInfo(TVdjPluginInfo8 *infos)
 {
     infos->PluginName   = "VU Meter";
     infos->Author       = "Brian";
-    infos->Description  = "LU | dB - calibrado como Klanghelm RMS +3dB";
-    infos->Version      = "1.8";
+    infos->Description  = "L | R - RMS +3dB (AES-17), ballistica VU 300ms";
+    infos->Version      = "1.9";
     infos->Flags        = 0x00;
     infos->Bitmap       = NULL;
     return S_OK;
 }
 
 // ---------------------------------------------------------------------------
-HRESULT VDJ_API CVUMeter::OnStart()  { return S_OK; }
-HRESULT VDJ_API CVUMeter::OnStop()   { return S_OK; }
+HRESULT VDJ_API CVUMeter::OnStart()
+{
+    // Obtener sample rate del host
+    if (cb->GetSampleRate)
+        m_sampleRate = cb->GetSampleRate();
+
+    // Reiniciar estado
+    m_rmsL    = 0.0f;
+    m_rmsR    = 0.0f;
+    m_counter = 0;
+    return S_OK;
+}
+
+HRESULT VDJ_API CVUMeter::OnStop() { return S_OK; }
 
 // ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
 {
     if (!buffer || nb <= 0) return S_OK;
 
-    double sumL = 0.0, sumR = 0.0;
+    // Calcular alpha según duración real del bloque
+    // tau = VU_INTEGRATION_MS / 1000
+    // alpha = 1 - exp(-blockDuration / tau)
+    float blockDuration = (float)nb / (float)m_sampleRate;
+    float tau           = VU_INTEGRATION_MS / 1000.0f;
+    float alpha         = 1.0f - expf(-blockDuration / tau);
 
+    // Acumular energía por canal (interleaved: L, R, L, R...)
+    double sumL = 0.0, sumR = 0.0;
     for (int i = 0; i < nb * 2; i += 2)
     {
-        sumL += buffer[i]   * buffer[i];
-        sumR += buffer[i+1] * buffer[i+1];
+        double sL = buffer[i];
+        double sR = buffer[i + 1];
+        sumL += sL * sL;
+        sumR += sR * sR;
     }
 
-    // RMS combinado estéreo (exactamente como Klanghelm)
-    float rmsCombined = (float)sqrt((sumL + sumR) / (nb * 2.0));
+    // RMS instantáneo por canal
+    float rmsInstL = (float)sqrt(sumL / nb);
+    float rmsInstR = (float)sqrt(sumR / nb);
 
-    // Suavizado lento
-    const float alpha = 0.09f;
-    m_rmsL = m_rmsL * (1.0f - alpha) + rmsCombined * alpha;
-    m_rmsR = m_rmsL;
+    // Suavizado exponencial independiente por canal (ballística VU)
+    m_rmsL = m_rmsL * (1.0f - alpha) + rmsInstL * alpha;
+    m_rmsR = m_rmsR * (1.0f - alpha) + rmsInstR * alpha;
 
-    // Valor final con +3dB AES-17
-    float value = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) + 3.0f : -60.0f;
+    // Convertir a dBFS con corrección +3dB AES-17
+    float dbL = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) + 3.0f : -60.0f;
+    float dbR = (m_rmsR > RMS_FLOOR) ? 20.0f * log10f(m_rmsR) + 3.0f : -60.0f;
 
-    // Actualizar display cada ~400 ms (fácil de leer)
+    // Actualizar display ~15 veces por segundo (legible, sin parpadeo)
     m_counter++;
-    if (m_counter >= 24)
+    if (m_counter >= (m_sampleRate / nb / 15))
     {
-        m_luDisplay = value;
-        m_dbDisplay = value;
-        m_counter = 0;
+        m_luDisplay = dbL;  // Izquierdo
+        m_dbDisplay = dbR;  // Derecho
+        m_counter   = 0;
     }
 
     return S_OK;
@@ -72,10 +99,10 @@ HRESULT VDJ_API CVUMeter::OnGetParameterString(int id, char *outParam, int outPa
     switch (id)
     {
         case ID_LU:
-            sprintf(outParam, "%.1f", m_luDisplay);
+            snprintf(outParam, outParamSize, "%.1f", m_luDisplay);
             break;
         case ID_DB:
-            sprintf(outParam, "%.1f", m_dbDisplay);
+            snprintf(outParam, outParamSize, "%.1f", m_dbDisplay);
             break;
         default:
             if (outParamSize > 0) outParam[0] = '\0';
