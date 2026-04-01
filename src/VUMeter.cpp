@@ -1,10 +1,10 @@
 #include "VUMeter.h"
 
 // ---------------------------------------------------------------------------
-// Range: -60 dB → 0 dB mapped to slider 0.0 → 1.0
+// Constants
 // ---------------------------------------------------------------------------
 static const float DB_FLOOR = -60.0f;
-static const float DB_CEIL = 0.0f;
+static const float DB_CEIL  = 0.0f;
 static const float DB_RANGE = DB_CEIL - DB_FLOOR;
 static const float RMS_FLOOR = 0.000001f;
 
@@ -23,9 +23,9 @@ CVUMeter::~CVUMeter() {}
 // ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnLoad()
 {
-    // Declarar parámetros (forma correcta en SDK público)
-    DeclareParameter(&m_levelL, VDJPARAM_SLIDER, ID_METER_L, "Level L", "L", 1.0f);
-    DeclareParameter(&m_levelR, VDJPARAM_SLIDER, ID_METER_R, "Level R", "R", 1.0f);
+    // Forma correcta en SDK público: usar el host
+    m_pVdjHost->DeclareParameter(&m_levelL, VDJPARAM_SLIDER, ID_METER_L, "Level L", "L", 1.0f);
+    m_pVdjHost->DeclareParameter(&m_levelR, VDJPARAM_SLIDER, ID_METER_R, "Level R", "R", 1.0f);
 
     return S_OK;
 }
@@ -33,32 +33,19 @@ HRESULT VDJ_API CVUMeter::OnLoad()
 // ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnGetPluginInfo(TVdjPluginInfo8 *infos)
 {
-    infos->PluginName = "VU Meter";
-    infos->Author = "Brian";
-    infos->Description = "Stereo RMS / dBFS VU Meter for VirtualDJ";
-    infos->Version = "1.0";
-    infos->Flags = 0x00;
-    infos->Bitmap = NULL;
+    infos->PluginName   = "VU Meter";
+    infos->Author       = "Brian";
+    infos->Description  = "Stereo RMS / dBFS VU Meter for VirtualDJ";
+    infos->Version      = "1.0";
+    infos->Flags        = 0x00;
+    infos->Bitmap       = NULL;
     return S_OK;
 }
 
 // ---------------------------------------------------------------------------
-HRESULT VDJ_API CVUMeter::OnStart()
-{
-    m_rmsL = m_rmsR = 0.0f;
-    m_dbL = m_dbR = DB_FLOOR;
-    m_levelL = m_levelR = 0.0f;
-    return S_OK;
-}
+HRESULT VDJ_API CVUMeter::OnStart()  { return S_OK; }
+HRESULT VDJ_API CVUMeter::OnStop()   { return S_OK; }
 
-// ---------------------------------------------------------------------------
-HRESULT VDJ_API CVUMeter::OnStop()
-{
-    return S_OK;
-}
-
-// ---------------------------------------------------------------------------
-// Procesamiento principal (método requerido por IVdjPluginDsp8)
 // ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
 {
@@ -67,7 +54,6 @@ HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
 
     double sumL = 0.0, sumR = 0.0;
 
-    // Stereo interleaved
     for (int i = 0; i < nb * 2; i += 2)
     {
         double l = buffer[i];
@@ -79,21 +65,19 @@ HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
     float instantL = (float)sqrt(sumL / nb);
     float instantR = (float)sqrt(sumR / nb);
 
-    // Suavizado exponencial
-    const float ATTACK = 0.5f;
+    const float ATTACK  = 0.5f;
     const float RELEASE = 0.05f;
 
     m_rmsL = m_rmsL + (instantL > m_rmsL ? ATTACK : RELEASE) * (instantL - m_rmsL);
     m_rmsR = m_rmsR + (instantR > m_rmsR ? ATTACK : RELEASE) * (instantR - m_rmsR);
 
-    // RMS → dBFS
     m_dbL = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) : DB_FLOOR;
     m_dbR = (m_rmsR > RMS_FLOOR) ? 20.0f * log10f(m_rmsR) : DB_FLOOR;
 
     m_levelL = toSlider(m_dbL);
     m_levelR = toSlider(m_dbR);
 
-    return S_OK;   // audio sin modificar
+    return S_OK;
 }
 
 // ---------------------------------------------------------------------------
