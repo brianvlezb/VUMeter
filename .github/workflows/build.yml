@@ -1,0 +1,96 @@
+name: Build VUMeter DLL
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build 64-bit DLL (Windows / MSVC)
+    runs-on: windows-latest
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout repo
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 2. Download VirtualDJ SDK headers
+      # -----------------------------------------------------------------------
+      - name: Download VirtualDJ SDK
+        shell: pwsh
+        run: |
+          $url  = "https://www.virtualdj.com/developers/VirtualDJ8_SDK_20211003.zip"
+          $dest = "$env:RUNNER_TEMP\vdjsdk.zip"
+          Invoke-WebRequest -Uri $url -OutFile $dest
+          Expand-Archive -Path $dest -DestinationPath "$env:RUNNER_TEMP\vdjsdk" -Force
+          Write-Host "=== SDK contents ==="
+          Get-ChildItem "$env:RUNNER_TEMP\vdjsdk" -Recurse -Include "*.h" | Select-Object FullName
+
+      # -----------------------------------------------------------------------
+      # 3. Locate the folder that actually contains vdjPlugin8.h
+      # -----------------------------------------------------------------------
+      - name: Locate SDK include path
+        shell: pwsh
+        run: |
+          $h = Get-ChildItem "$env:RUNNER_TEMP\vdjsdk" -Recurse -Filter "vdjPlugin8.h" |
+               Select-Object -First 1
+          if (-not $h) { throw "vdjPlugin8.h not found in SDK zip!" }
+          $dir = $h.DirectoryName
+          Write-Host "SDK include dir: $dir"
+          echo "VDJ_INC=$dir" >> $env:GITHUB_ENV
+
+      # -----------------------------------------------------------------------
+      # 4. Set up MSVC environment (64-bit)
+      # -----------------------------------------------------------------------
+      - name: Set up MSVC (x64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # -----------------------------------------------------------------------
+      # 5. Compile → VUMeter.dll  (64-bit release)
+      # -----------------------------------------------------------------------
+      - name: Compile VUMeter.dll
+        shell: cmd
+        run: |
+          set INC=%VDJ_INC%
+          cl.exe ^
+            /LD ^
+            /O2 ^
+            /EHsc ^
+            /std:c++17 ^
+            /W3 ^
+            /nologo ^
+            /I "%INC%" ^
+            src\VUMeter.cpp ^
+            src\Main.cpp ^
+            /Fe:VUMeter.dll ^
+            /link ^
+            /DEF:VUMeter.def ^
+            /MACHINE:X64 ^
+            /SUBSYSTEM:WINDOWS ^
+            kernel32.lib
+
+      # -----------------------------------------------------------------------
+      # 6. Verify the export is present
+      # -----------------------------------------------------------------------
+      - name: Verify DLL export
+        shell: cmd
+        run: dumpbin /EXPORTS VUMeter.dll
+
+      # -----------------------------------------------------------------------
+      # 7. Upload artifact  →  place in Documents\VirtualDJ\Plugins64\Dsp\
+      # -----------------------------------------------------------------------
+      - name: Upload VUMeter.dll
+        uses: actions/upload-artifact@v4
+        with:
+          name: VUMeter-dll-x64
+          path: VUMeter.dll
+          if-no-files-found: error
+          retention-days: 30
