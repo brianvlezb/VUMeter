@@ -19,8 +19,8 @@ HRESULT VDJ_API CVUMeter::OnGetPluginInfo(TVdjPluginInfo8 *infos)
 {
     infos->PluginName   = "VU Meter";
     infos->Author       = "Brian";
-    infos->Description  = "LU (izq) | dB (der) - lento";
-    infos->Version      = "1.4";
+    infos->Description  = "LU | dB - lento como Klanghelm";
+    infos->Version      = "1.6";
     infos->Flags        = 0x00;
     infos->Bitmap       = NULL;
     return S_OK;
@@ -46,22 +46,23 @@ HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
     float rmsL = (float)sqrt(sumL / nb);
     float rmsR = (float)sqrt(sumR / nb);
 
-    // Suavizado interno rápido
-    const float alpha = 0.35f;
+    // Suavizado muy lento (como aguja analógica)
+    const float alpha = 0.08f;
     m_rmsL = m_rmsL * (1.0f - alpha) + rmsL * alpha;
     m_rmsR = m_rmsR * (1.0f - alpha) + rmsR * alpha;
 
-    // Cálculos reales
-    float currentLU = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) + 3.0f : -60.0f;
-    float currentDB = (m_rmsR > RMS_FLOOR) ? 20.0f * log10f(m_rmsR) : -60.0f;   // usamos el canal derecho como referencia para peak
+    // Cálculos
+    float currentLU = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) + 3.0f : -60.0f;  // +3dB AES-17
+    float currentDB = (m_rmsR > m_rmsL ? m_rmsR : m_rmsL);                           // canal más fuerte
+    currentDB = (currentDB > RMS_FLOOR) ? 20.0f * log10f(currentDB) : -60.0f;
 
-    // Actualizamos el display solo cada 12 buffers ≈ 200ms
-    m_updateCounter++;
-    if (m_updateCounter >= 12)
+    // Actualizar display solo cada 24 buffers ≈ 400 ms
+    m_counter++;
+    if (m_counter >= 24)
     {
         m_luDisplay = currentLU;
         m_dbDisplay = currentDB;
-        m_updateCounter = 0;
+        m_counter = 0;
     }
 
     return S_OK;
@@ -73,10 +74,10 @@ HRESULT VDJ_API CVUMeter::OnGetParameterString(int id, char *outParam, int outPa
     switch (id)
     {
         case ID_LU:
-            sprintf(outParam, "%.1f", m_luDisplay);   // Izquierda: LU
+            sprintf(outParam, "%.1f", m_luDisplay);
             break;
         case ID_DB:
-            sprintf(outParam, "%.1f", m_dbDisplay);   // Derecha: dB
+            sprintf(outParam, "%.1f", m_dbDisplay);
             break;
         default:
             if (outParamSize > 0) outParam[0] = '\0';
