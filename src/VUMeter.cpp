@@ -20,7 +20,7 @@ HRESULT VDJ_API CVUMeter::OnGetPluginInfo(TVdjPluginInfo8 *infos)
     infos->PluginName   = "VU Meter";
     infos->Author       = "Brian";
     infos->Description  = "LU | dB - calibrado como Klanghelm RMS +3dB";
-    infos->Version      = "1.7";
+    infos->Version      = "1.8";
     infos->Flags        = 0x00;
     infos->Bitmap       = NULL;
     return S_OK;
@@ -43,23 +43,23 @@ HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
         sumR += buffer[i+1] * buffer[i+1];
     }
 
-    // RMS combinado de ambos canales (exactamente como Klanghelm)
+    // RMS combinado estéreo (exactamente como Klanghelm)
     float rmsCombined = (float)sqrt((sumL + sumR) / (nb * 2.0));
 
-    // Suavizado lento (como aguja analógica)
+    // Suavizado lento
     const float alpha = 0.09f;
     m_rmsL = m_rmsL * (1.0f - alpha) + rmsCombined * alpha;
     m_rmsR = m_rmsL;
 
-    // Cálculo final idéntico a Klanghelm RMS +3dB (AES-17)
-    float currentValue = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) + 3.0f : -60.0f;
+    // Valor final con +3dB AES-17
+    float value = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) + 3.0f : -60.0f;
 
-    // Actualizar display cada ~400 ms para que se pueda leer
+    // Actualizar display cada ~400 ms (fácil de leer)
     m_counter++;
     if (m_counter >= 24)
     {
-        m_luDisplay = currentValue;
-        m_dbDisplay = currentValue;
+        m_luDisplay = value;
+        m_dbDisplay = value;
         m_counter = 0;
     }
 
