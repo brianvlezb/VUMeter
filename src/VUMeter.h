@@ -21,18 +21,18 @@ public:
     HRESULT VDJ_API OnGetParameterString(int id, char *outParam, int outParamSize);
 
 private:
-    float m_luDisplay  = -60.0f;   // Izquierda: LU estimado (muestra lento)
-    float m_dbDisplay  = -60.0f;   // Derecha: dB (muestra lento)
+    float m_luDisplay = -60.0f;   // Izquierda: LU estimado (lento)
+    float m_dbDisplay = -60.0f;   // Derecha: dB peak/RMS (lento)
 
     float m_rmsL = 0.0f;
     float m_rmsR = 0.0f;
 
-    int   m_updateCounter = 0;
+    int   m_counter = 0;
 
     typedef enum _ID_Interface
     {
-        ID_LU = 0,   // Izquierda
-        ID_DB = 1    // Derecha
+        ID_LU = 0,
+        ID_DB = 1
     } ID_Interface;
 };
 
