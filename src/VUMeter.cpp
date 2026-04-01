@@ -23,9 +23,9 @@ CVUMeter::~CVUMeter() {}
 // ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnLoad()
 {
-    // Forma correcta en SDK público: usar el host
-    m_pVdjHost->DeclareParameter(&m_levelL, VDJPARAM_SLIDER, ID_METER_L, "Level L", "L", 1.0f);
-    m_pVdjHost->DeclareParameter(&m_levelR, VDJPARAM_SLIDER, ID_METER_R, "Level R", "R", 1.0f);
+    // cb es el puntero que VirtualDJ proporciona (disponible en la clase base)
+    cb->DeclareParameter(&m_levelL, VDJPARAM_SLIDER, ID_METER_L, "Level L", "L", 1.0f);
+    cb->DeclareParameter(&m_levelR, VDJPARAM_SLIDER, ID_METER_R, "Level R", "R", 1.0f);
 
     return S_OK;
 }
