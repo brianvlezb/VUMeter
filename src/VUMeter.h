@@ -21,17 +21,16 @@ public:
     HRESULT VDJ_API OnGetParameterString(int id, char *outParam, int outParamSize);
 
 private:
-    float m_levelL = 0.0f;
-    float m_levelR = 0.0f;
-    float m_rmsL   = 0.0f;
-    float m_rmsR   = 0.0f;
-    float m_dbL    = -60.0f;
-    float m_dbR    = -60.0f;
+    float m_lufsL = -60.0f;   // Valor izquierdo: LUFS estimado
+    float m_dbR   = -60.0f;   // Valor derecho: dB RMS
+
+    float m_rmsL = 0.0f;
+    float m_rmsR = 0.0f;
 
     typedef enum _ID_Interface
     {
-        ID_METER_L = 0,
-        ID_METER_R = 1
+        ID_LEFT  = 0,   // LUFS
+        ID_RIGHT = 1    // dB
     } ID_Interface;
 };
 
