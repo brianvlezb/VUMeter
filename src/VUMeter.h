@@ -20,8 +20,8 @@ public:
     HRESULT VDJ_API OnGetParameterString(int id, char *outParam, int outParamSize);
 
 private:
-    float m_luDisplay = -60.0f;   // Izquierda: LU (como Klanghelm)
-    float m_dbDisplay = -60.0f;   // Derecha: dB RMS combinado +3dB
+    float m_luDisplay = -60.0f;   // Izquierda: LU (RMS +3dB)
+    float m_dbDisplay = -60.0f;   // Derecha: dB RMS combinado
 
     float m_rmsL = 0.0f;
     float m_rmsR = 0.0f;
