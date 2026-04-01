@@ -19,8 +19,8 @@ HRESULT VDJ_API CVUMeter::OnGetPluginInfo(TVdjPluginInfo8 *infos)
 {
     infos->PluginName   = "VU Meter";
     infos->Author       = "Brian";
-    infos->Description  = "LU | dB - lento como Klanghelm";
-    infos->Version      = "1.6";
+    infos->Description  = "LU | dB - calibrado como Klanghelm RMS +3dB";
+    infos->Version      = "1.7";
     infos->Flags        = 0x00;
     infos->Bitmap       = NULL;
     return S_OK;
@@ -43,25 +43,23 @@ HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
         sumR += buffer[i+1] * buffer[i+1];
     }
 
-    float rmsL = (float)sqrt(sumL / nb);
-    float rmsR = (float)sqrt(sumR / nb);
+    // RMS combinado de ambos canales (exactamente como Klanghelm)
+    float rmsCombined = (float)sqrt((sumL + sumR) / (nb * 2.0));
 
-    // Suavizado muy lento (como aguja analógica)
-    const float alpha = 0.08f;
-    m_rmsL = m_rmsL * (1.0f - alpha) + rmsL * alpha;
-    m_rmsR = m_rmsR * (1.0f - alpha) + rmsR * alpha;
+    // Suavizado lento (como aguja analógica)
+    const float alpha = 0.09f;
+    m_rmsL = m_rmsL * (1.0f - alpha) + rmsCombined * alpha;
+    m_rmsR = m_rmsL;
 
-    // Cálculos
-    float currentLU = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) + 3.0f : -60.0f;  // +3dB AES-17
-    float currentDB = (m_rmsR > m_rmsL ? m_rmsR : m_rmsL);                           // canal más fuerte
-    currentDB = (currentDB > RMS_FLOOR) ? 20.0f * log10f(currentDB) : -60.0f;
+    // Cálculo final idéntico a Klanghelm RMS +3dB (AES-17)
+    float currentValue = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) + 3.0f : -60.0f;
 
-    // Actualizar display solo cada 24 buffers ≈ 400 ms
+    // Actualizar display cada ~400 ms para que se pueda leer
     m_counter++;
     if (m_counter >= 24)
     {
-        m_luDisplay = currentLU;
-        m_dbDisplay = currentDB;
+        m_luDisplay = currentValue;
+        m_dbDisplay = currentValue;
         m_counter = 0;
     }
 
