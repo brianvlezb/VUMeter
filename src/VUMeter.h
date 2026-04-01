@@ -17,7 +17,7 @@ public:
     HRESULT VDJ_API OnGetPluginInfo(TVdjPluginInfo8 *infos);
     HRESULT VDJ_API OnStart();
     HRESULT VDJ_API OnStop();
-    HRESULT VDJ_API OnProcessSamples(float *buffer, int nb);   // ← Cambiado (obligatorio)
+    HRESULT VDJ_API OnProcessSamples(float *buffer, int nb);
     HRESULT VDJ_API OnGetParameterString(int id, char *outParam, int outParamSize);
 
 private:
