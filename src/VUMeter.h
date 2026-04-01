@@ -1,86 +1,36 @@
-#include "VUMeter.h"
+#pragma once
 
-static const float RMS_FLOOR = 0.000001f;
+#define _CRT_SECURE_NO_WARNINGS
 
-// ---------------------------------------------------------------------------
-CVUMeter::CVUMeter()  {}
-CVUMeter::~CVUMeter() {}
+#include <stdio.h>
+#include <math.h>
+#include "vdjDsp8.h"
 
-// ---------------------------------------------------------------------------
-HRESULT VDJ_API CVUMeter::OnLoad()
+class CVUMeter : public IVdjPluginDsp8
 {
-    cb->DeclareParameter(&m_luDisplay, VDJPARAM_SLIDER, ID_LU, "LU", "LU", 1.0f);
-    cb->DeclareParameter(&m_dbDisplay, VDJPARAM_SLIDER, ID_DB, "dB", "dB", 1.0f);
-    return S_OK;
-}
+public:
+    CVUMeter();
+    ~CVUMeter();
 
-// ---------------------------------------------------------------------------
-HRESULT VDJ_API CVUMeter::OnGetPluginInfo(TVdjPluginInfo8 *infos)
-{
-    infos->PluginName   = "VU Meter";
-    infos->Author       = "Brian";
-    infos->Description  = "LU | dB - estilo Klanghelm RMS";
-    infos->Version      = "1.7";
-    infos->Flags        = 0x00;
-    infos->Bitmap       = NULL;
-    return S_OK;
-}
+    HRESULT VDJ_API OnLoad();
+    HRESULT VDJ_API OnGetPluginInfo(TVdjPluginInfo8 *infos);
+    HRESULT VDJ_API OnStart();
+    HRESULT VDJ_API OnStop();
+    HRESULT VDJ_API OnProcessSamples(float *buffer, int nb);
+    HRESULT VDJ_API OnGetParameterString(int id, char *outParam, int outParamSize);
 
-// ---------------------------------------------------------------------------
-HRESULT VDJ_API CVUMeter::OnStart()  { return S_OK; }
-HRESULT VDJ_API CVUMeter::OnStop()   { return S_OK; }
+private:
+    float m_luDisplay = -60.0f;   // Izquierda: LU (como Klanghelm)
+    float m_dbDisplay = -60.0f;   // Derecha: dB RMS
 
-// ---------------------------------------------------------------------------
-HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
-{
-    if (!buffer || nb <= 0) return S_OK;
+    float m_rmsL = 0.0f;
+    float m_rmsR = 0.0f;
 
-    double sumL = 0.0, sumR = 0.0;
+    int   m_counter = 0;
 
-    for (int i = 0; i < nb * 2; i += 2)
+    typedef enum _ID_Interface
     {
-        sumL += buffer[i]   * buffer[i];
-        sumR += buffer[i+1] * buffer[i+1];
-    }
-
-    // RMS combinado de ambos canales (como hace Klanghelm en RMS)
-    float rmsCombined = (float)sqrt((sumL + sumR) / (nb * 2.0));
-
-    // Suavizado muy lento (como aguja analógica)
-    const float alpha = 0.09f;
-    m_rmsL = m_rmsL * (1.0f - alpha) + rmsCombined * alpha;  // usamos rmsCombined para ambos
-    m_rmsR = m_rmsL;
-
-    // Cálculos finales
-    float currentLU = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) + 3.0f : -60.0f;
-    float currentDB = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) + 3.0f : -60.0f;   // +3dB AES-17
-
-    // Actualizar display solo cada 24 buffers ≈ 400 ms
-    m_counter++;
-    if (m_counter >= 24)
-    {
-        m_luDisplay = currentLU;
-        m_dbDisplay = currentDB;
-        m_counter = 0;
-    }
-
-    return S_OK;
-}
-
-// ---------------------------------------------------------------------------
-HRESULT VDJ_API CVUMeter::OnGetParameterString(int id, char *outParam, int outParamSize)
-{
-    switch (id)
-    {
-        case ID_LU:
-            sprintf(outParam, "%.1f", m_luDisplay);
-            break;
-        case ID_DB:
-            sprintf(outParam, "%.1f", m_dbDisplay);
-            break;
-        default:
-            if (outParamSize > 0) outParam[0] = '\0';
-            break;
-    }
-    return S_OK;
-}
+        ID_LU = 0,
+        ID_DB = 1
+    } ID_Interface;
+};
