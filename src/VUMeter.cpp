@@ -88,7 +88,7 @@ HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
 
     // Actualizar display ~3 veces por segundo (legible)
     m_counter++;
-    if (m_counter >= (m_sampleRate / nb / 1))
+    if (m_counter >= (m_sampleRate / nb / 3))
     {
         m_luDisplay = dbL;      // Izquierdo: RMS
         m_dbDisplay = dbPeak;   // Derecho:   Peak dBFS
