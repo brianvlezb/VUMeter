@@ -1,13 +1,10 @@
 #include "VUMeter.h"
 
-// Umbral mínimo para evitar log(0)
 static const float RMS_FLOOR = 0.000001f;
 
-// ---------------------------------------------------------------------------
 CVUMeter::CVUMeter()  {}
 CVUMeter::~CVUMeter() {}
 
-// ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnLoad()
 {
     cb->DeclareParameter(&m_luDisplay, VDJPARAM_SLIDER, ID_LU, "LU", "LU", 1.0f);
@@ -15,19 +12,17 @@ HRESULT VDJ_API CVUMeter::OnLoad()
     return S_OK;
 }
 
-// ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnGetPluginInfo(TVdjPluginInfo8 *infos)
 {
     infos->PluginName   = "VU Meter";
     infos->Author       = "Brian";
     infos->Description  = "L | R - RMS +3dB (AES-17), ballistica VU 300ms";
-    infos->Version      = "1.9";
+    infos->Version      = "2.0";
     infos->Flags        = 0x00;
     infos->Bitmap       = NULL;
     return S_OK;
 }
 
-// ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnStart()
 {
     m_sampleRate = 44100;
@@ -40,12 +35,10 @@ HRESULT VDJ_API CVUMeter::OnStart()
 
 HRESULT VDJ_API CVUMeter::OnStop() { return S_OK; }
 
-// ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
 {
     if (!buffer || nb <= 0) return S_OK;
 
-    // Acumular energía RMS y detectar peak por bloque
     double sumL = 0.0, sumR = 0.0;
     float  blockPeak = 0.0f;
 
@@ -53,53 +46,48 @@ HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
     {
         double sL = buffer[i];
         double sR = buffer[i + 1];
-
         sumL += sL * sL;
         sumR += sR * sR;
 
-        // Peak: máximo absoluto de ambos canales (mejor precisión)
         float absL = fabsf(buffer[i]);
         float absR = fabsf(buffer[i + 1]);
         if (absL > blockPeak) blockPeak = absL;
-        if (absR > blockPeak) blockPeak = absR;   // ← más directo y fiable
+        if (absR > blockPeak) blockPeak = absR;
     }
 
-    // RMS instantáneo por canal (para LU, izquierdo)
     float rmsInstL = (float)sqrt(sumL / nb);
     float rmsInstR = (float)sqrt(sumR / nb);
 
-    // Suavizado exponencial RMS — ballística VU ~300ms
+    // VU ballistics IEC 60268-17: tau=65ms → 99% en 300ms (igual que VUMT)
     float blockDuration = (float)nb / (float)m_sampleRate;
-    float alpha         = 1.0f - expf(-blockDuration / 0.3f);
+    float alpha         = 1.0f - expf(-blockDuration / 0.065f);
     m_rmsL = m_rmsL * (1.0f - alpha) + rmsInstL * alpha;
     m_rmsR = m_rmsR * (1.0f - alpha) + rmsInstR * alpha;
 
-    // Peak hold con caída suave (1.5 de decay)
+    // Peak hold: ataque instantáneo, caída 1.5s
     float decayAlpha = 1.0f - expf(-blockDuration / 1.5f);
     if (blockPeak > m_peakHold)
-        m_peakHold = blockPeak;                             // ataque instantáneo
+        m_peakHold = blockPeak;
     else
-        m_peakHold = m_peakHold * (1.0f - decayAlpha);     // caída lenta
+        m_peakHold = m_peakHold * (1.0f - decayAlpha);
 
-    // Izquierdo: RMS +3dB AES-17 (igual que Klanghelm RMS mode)
-    float dbL   = (m_rmsL > RMS_FLOOR) ? 20.0f * log10f(m_rmsL) + 3.0f : -60.0f;
+    // RMS stereo promediado L²+R² (igual que VUMT RMS mode) + AES-17 +3.01dB
+    float rmsAvg = sqrtf((m_rmsL * m_rmsL + m_rmsR * m_rmsR) * 0.5f);
+    float dbLU   = (rmsAvg    > RMS_FLOOR) ? 20.0f * log10f(rmsAvg)    + 3.01f : -60.0f;
+    float dbPeak = (m_peakHold > RMS_FLOOR) ? 20.0f * log10f(m_peakHold)        : -60.0f;
 
-    // Derecho: Peak dBFS (sin corrección +3dB, igual que Klanghelm peak readout)
-    float dbPeak = (m_peakHold > RMS_FLOOR) ? 20.0f * log10f(m_peakHold) : -60.0f;
-
-    // Actualizar display ~3 veces por segundo (legible)
+    // ~3 actualizaciones por segundo
     m_counter++;
-    if (m_counter >= (m_sampleRate / nb / 1))
+    if (m_counter >= (int)(m_sampleRate / nb / 3))
     {
-        m_luDisplay = dbL;      // Izquierdo: RMS
-        m_dbDisplay = dbPeak;   // Derecho:   Peak dBFS
+        m_luDisplay = dbLU;
+        m_dbDisplay = dbPeak;
         m_counter   = 0;
     }
 
     return S_OK;
 }
 
-// ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnGetParameterString(int id, char *outParam, int outParamSize)
 {
     switch (id)
