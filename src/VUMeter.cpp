@@ -53,14 +53,15 @@ HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
     {
         double sL = buffer[i];
         double sR = buffer[i + 1];
+
         sumL += sL * sL;
         sumR += sR * sR;
 
-        // Peak: máximo absoluto de ambos canales
+        // Peak: máximo absoluto de ambos canales (mejor precisión)
         float absL = fabsf(buffer[i]);
         float absR = fabsf(buffer[i + 1]);
-        float mx   = absL > absR ? absL : absR;
-        if (mx > blockPeak) blockPeak = mx;
+        if (absL > blockPeak) blockPeak = absL;
+        if (absR > blockPeak) blockPeak = absR;   // ← más directo y fiable
     }
 
     // RMS instantáneo por canal (para LU, izquierdo)
@@ -73,8 +74,8 @@ HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
     m_rmsL = m_rmsL * (1.0f - alpha) + rmsInstL * alpha;
     m_rmsR = m_rmsR * (1.0f - alpha) + rmsInstR * alpha;
 
-    // Peak hold con caída suave (~600ms de decay)
-    float decayAlpha = 1.0f - expf(-blockDuration / 0.6f);
+    // Peak hold con caída suave (1.5 de decay)
+    float decayAlpha = 1.0f - expf(-blockDuration / 1.5f);
     if (blockPeak > m_peakHold)
         m_peakHold = blockPeak;                             // ataque instantáneo
     else
