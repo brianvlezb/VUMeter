@@ -10,8 +10,8 @@ CVUMeter::~CVUMeter() {}
 // ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnLoad()
 {
-    cb->DeclareParameter(&m_luDisplay, VDJPARAM_READOUT, ID_LU, "LU", "LU", 1.0f);
-    cb->DeclareParameter(&m_dbDisplay, VDJPARAM_READOUT, ID_DB, "dB", "dB", 1.0f);
+    cb->DeclareParameter(&m_luDisplay, VDJPARAM_SLIDER, ID_LU, "LU", "LU", 1.0f);
+    cb->DeclareParameter(&m_dbDisplay, VDJPARAM_SLIDER, ID_DB, "dB", "dB", 1.0f);
     return S_OK;
 }
 
@@ -88,7 +88,7 @@ HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
 
     // Actualizar display ~3 veces por segundo (legible)
     m_counter++;
-    if (m_counter >= (m_sampleRate / nb / 3))
+    if (m_counter >= (m_sampleRate / nb / 1))
     {
         m_luDisplay = dbL;      // Izquierdo: RMS
         m_dbDisplay = dbPeak;   // Derecho:   Peak dBFS
