@@ -10,8 +10,8 @@ CVUMeter::~CVUMeter() {}
 // ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnLoad()
 {
-    cb->DeclareParameter(&m_luDisplay, VDJPARAM_SLIDER, ID_LU, "LU", "LU", 1.0f);
-    cb->DeclareParameter(&m_dbDisplay, VDJPARAM_SLIDER, ID_DB, "dB", "dB", 1.0f);
+    cb->DeclareParameter(&m_luDisplay, VDJPARAM_READOUT, ID_LU, "LU", "LU", 1.0f);
+    cb->DeclareParameter(&m_dbDisplay, VDJPARAM_READOUT, ID_DB, "dB", "dB", 1.0f);
     return S_OK;
 }
 
@@ -86,9 +86,9 @@ HRESULT VDJ_API CVUMeter::OnProcessSamples(float *buffer, int nb)
     // Derecho: Peak dBFS (sin corrección +3dB, igual que Klanghelm peak readout)
     float dbPeak = (m_peakHold > RMS_FLOOR) ? 20.0f * log10f(m_peakHold) : -60.0f;
 
-    // Actualizar display ~15 veces por segundo
+    // Actualizar display ~3 veces por segundo (legible)
     m_counter++;
-    if (m_counter >= (m_sampleRate / nb / 15))
+    if (m_counter >= (m_sampleRate / nb / 3))
     {
         m_luDisplay = dbL;      // Izquierdo: RMS
         m_dbDisplay = dbPeak;   // Derecho:   Peak dBFS
