@@ -34,11 +34,9 @@ HRESULT VDJ_API CVUMeter::OnGetPluginInfo(TVdjPluginInfo8 *infos)
 // ---------------------------------------------------------------------------
 HRESULT VDJ_API CVUMeter::OnStart()
 {
-    // Obtener sample rate del host
-    if (cb->GetSampleRate)
-        m_sampleRate = cb->GetSampleRate();
+    // VirtualDJ opera a 44100 Hz internamente
+    m_sampleRate = 44100;
 
-    // Reiniciar estado
     m_rmsL    = 0.0f;
     m_rmsR    = 0.0f;
     m_counter = 0;
